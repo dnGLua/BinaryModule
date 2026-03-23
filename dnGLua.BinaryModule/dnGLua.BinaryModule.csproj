@@ -1,0 +1,629 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!-- ============================================================
+     CORE PROJECT SETTINGS
+     ============================================================ -->
+    <PropertyGroup>
+        <!-- Whether to build a client-side/server-side binary module -->
+        <IsClientModule>true</IsClientModule>
+        <!-- Specify binary module name (e.g. "mymodule" => require("mymodule")) -->
+        <AssemblyName>mymodule</AssemblyName>
+
+        <RootNamespace></RootNamespace>
+        <LangVersion>preview</LangVersion>
+        <EnablePreviewFeatures>true</EnablePreviewFeatures>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <!-- Whether to disable code optimizations -->
+        <DisableOptimization>false</DisableOptimization>
+        <!-- Whether to disable PDB generation -->
+        <DisablePdb>false</DisablePdb>
+        <!-- Whether to compile mynativelib as DLL instead of static library -->
+        <CompileMyNativeLibAsDll>true</CompileMyNativeLibAsDll>
+    </PropertyGroup>
+
+    <!-- DO NOT MODIFY OR TOUCH THE REST OF THIS FILE, UNLESS YOU KNOW WHAT YOU ARE DOING -->
+
+    <PropertyGroup>
+        <!--<PublishAot>true</PublishAot>-->
+
+        <OutputPath>bin\</OutputPath>
+        <PublishDir>publish\</PublishDir>
+        <OutputType>Library</OutputType>
+        <DisableRuntimeMarshalling>true</DisableRuntimeMarshalling>
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+        <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+        <AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
+        <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+        <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+        <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+        <!-- This must be true for managed (non-NativeAOT) version; otherwise, it will crash -->
+        <GenerateRuntimeConfigurationFiles Condition="'$(PublishAot)' != 'true'">true</GenerateRuntimeConfigurationFiles>
+        <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+        <BaseIntermediateOutputPath>obj\</BaseIntermediateOutputPath>
+        <IntermediateOutputPath>$(BaseIntermediateOutputPath)$(Configuration)\</IntermediateOutputPath>
+        <CompilerGeneratedFilesOutputPath>$(IntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
+        <GenerateSatelliteAssemblies>false</GenerateSatelliteAssemblies>
+        <ProduceReferenceAssembly Condition="'$(PublishAot)' != 'true'">true</ProduceReferenceAssembly>
+        <!--<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>-->
+        <EnableDynamicLoading>true</EnableDynamicLoading>
+        <Deterministic>true</Deterministic> <!-- reproducible builds -->
+        <WarningLevel>4</WarningLevel>
+        <ErrorReport>none</ErrorReport>
+        <NoWarn>$(NoWarn);</NoWarn>
+        <WarningsAsErrors>$(WarningsAsErrors);</WarningsAsErrors>
+        <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+        <IsPackable>false</IsPackable>
+
+        <PublishSingleFile>false</PublishSingleFile>
+        <PublishReadyToRun>false</PublishReadyToRun>
+        <TieredCompilationQuickJit>false</TieredCompilationQuickJit>
+        <TieredCompilation>false</TieredCompilation>
+        <UseWindowsForms>false</UseWindowsForms>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <Configurations>Debug;Release</Configurations>
+        <Platforms>x64;x86</Platforms>
+        <!--<RuntimeIdentifiers>win-x64;win-x86;linux-x64;osx-x64</RuntimeIdentifiers>-->
+    </PropertyGroup>
+
+    <!-- Define constants for NativeAOT builds -->
+    <PropertyGroup Condition="'$(PublishAot)' == 'true'">
+        <DefineConstants>$(DefineConstants);NATIVE_AOT</DefineConstants>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Platform)' == 'x64'">
+        <DefineConstants>$(DefineConstants);X64</DefineConstants>
+        <PlatformTarget>x64</PlatformTarget>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Platform)' == 'x86'">
+        <DefineConstants>$(DefineConstants);X86</DefineConstants>
+        <PlatformTarget>x86</PlatformTarget>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+        <DefineConstants>$(DefineConstants);DEBUG;TRACE</DefineConstants>
+        <Optimize>false</Optimize>
+        <DebugSymbols>true</DebugSymbols>
+        <DebugType>portable</DebugType>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+        <DefineConstants>$(DefineConstants);TRACE</DefineConstants>
+        <Optimize>true</Optimize>
+        <DebugSymbols>true</DebugSymbols>
+        <DebugType>portable</DebugType>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(DisableOptimization)' == 'true'">
+        <!-- NOTE: Override; keep this below Release configuration -->
+        <Optimize>false</Optimize>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(DisablePdb)' == 'true'">
+        <!-- NOTE: Override; keep this below Debug/Release configurations -->
+        <DebugSymbols>false</DebugSymbols>
+        <DebugType>none</DebugType>
+    </PropertyGroup>
+
+    <Choose>
+        <When Condition="'$(IsClientModule)' == 'true'">
+            <PropertyGroup>
+                <DefineConstants>$(DefineConstants);CLIENT</DefineConstants>
+            </PropertyGroup>
+        </When>
+        <Otherwise>
+            <PropertyGroup>
+                <IsClientModule>false</IsClientModule>
+                <DefineConstants>$(DefineConstants);SERVER</DefineConstants>
+            </PropertyGroup>
+        </Otherwise>
+    </Choose>
+
+    <Choose>
+        <When Condition="'$(DisableRuntimeMarshalling)' == 'true'">
+            <PropertyGroup>
+                <DefineConstants>$(DefineConstants);DISABLE_RUNTIME_MARSHALLING</DefineConstants>
+            </PropertyGroup>
+            <ItemGroup Condition="'$(GenerateAssemblyInfo)' == 'false'">
+                <AssemblyAttribute Include="System.Runtime.CompilerServices.DisableRuntimeMarshallingAttribute"/>
+            </ItemGroup>
+        </When>
+    </Choose>
+
+    <!-- OS detection -->
+    <PropertyGroup Condition="'$(RuntimeIdentifier)' == ''">
+        <RuntimeIdentifier Condition="'$(OS)' == 'Windows_NT'">win-$(Platform)</RuntimeIdentifier>
+        <RuntimeIdentifier Condition="'$(OS)' == 'Unix' AND '$(IsMacOS)' != 'true'">linux-$(Platform)</RuntimeIdentifier>
+        <RuntimeIdentifier Condition="'$(IsMacOS)' == 'true'">osx-$(Platform)</RuntimeIdentifier>
+    </PropertyGroup>
+
+    <!-- Architecture detection -->
+    <PropertyGroup Condition="$(RuntimeIdentifier.EndsWith('x64'))">
+        <IsX64>true</IsX64>
+        <DefineConstants>$(DefineConstants);ARCH_X64;TARGET_X64</DefineConstants>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="$(RuntimeIdentifier.EndsWith('x86'))">
+        <IsX86>true</IsX86>
+        <DefineConstants>$(DefineConstants);ARCH_X86;TARGET_X86</DefineConstants>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="$(RuntimeIdentifier.EndsWith('arm64'))">
+        <IsARM64>true</IsARM64>
+        <DefineConstants>$(DefineConstants);ARCH_ARM64;TARGET_ARM64</DefineConstants>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="$(RuntimeIdentifier.EndsWith('arm'))">
+        <IsARM>true</IsARM>
+        <DefineConstants>$(DefineConstants);ARCH_ARM;TARGET_ARM</DefineConstants>
+    </PropertyGroup>
+
+    <!-- Platform detection -->
+    <Choose>
+        <When Condition="$(RuntimeIdentifier.StartsWith('win'))">
+            <PropertyGroup>
+                <!-- Windows platform (32-bit and 64-bit) -->
+                <TargetFramework Condition="'$(UseWindowsForms)' == 'true'">net10.0-windows</TargetFramework>
+                <TargetFramework Condition="'$(UseWindowsForms)' != 'true'">net10.0</TargetFramework>
+                <IsWindows>true</IsWindows>
+                <DefineConstants>$(DefineConstants);WINDOWS;PLATFORM_WINDOWS</DefineConstants>
+                <LibraryExtension>.dll</LibraryExtension>
+                <MyNativeLibDir>$(MSBuildProjectDirectory)\..\mynativelib\</MyNativeLibDir>
+                <!-- Windows 64-bit -->
+                <ArchSuffix Condition="$(RuntimeIdentifier.EndsWith('x64'))">win64</ArchSuffix>
+                <DefineConstants Condition="$(RuntimeIdentifier.EndsWith('x64'))">$(DefineConstants);_WIN64</DefineConstants>
+                <!-- Windows 32-bit -->
+                <ArchSuffix Condition="$(RuntimeIdentifier.EndsWith('x86'))">win32</ArchSuffix>
+                <DefineConstants Condition="$(RuntimeIdentifier.EndsWith('x86'))">$(DefineConstants);_WIN32</DefineConstants>
+            </PropertyGroup>
+        </When>
+        <Otherwise>
+            <PropertyGroup>
+                <IsWindows>false</IsWindows>
+            </PropertyGroup>
+        </Otherwise>
+    </Choose>
+
+    <Choose>
+        <When Condition="$(RuntimeIdentifier.StartsWith('linux'))">
+            <PropertyGroup>
+                <!-- Linux platform -->
+                <TargetFramework>net10.0</TargetFramework>
+                <IsLinux>true</IsLinux>
+                <DefineConstants>$(DefineConstants);LINUX;PLATFORM_LINUX</DefineConstants>
+                <LibraryExtension>.so</LibraryExtension>
+                <MyNativeLibDir>$(MSBuildProjectDirectory)/../mynativelib/</MyNativeLibDir>
+                <!-- Linux 64-bit -->
+                <ArchSuffix Condition="$(RuntimeIdentifier.EndsWith('x64'))">linux64</ArchSuffix>
+                <!-- Linux 32-bit -->
+                <ArchSuffix Condition="$(RuntimeIdentifier.EndsWith('x86'))">linux</ArchSuffix>
+            </PropertyGroup>
+        </When>
+        <Otherwise>
+            <PropertyGroup>
+                <IsLinux>false</IsLinux>
+            </PropertyGroup>
+        </Otherwise>
+    </Choose>
+
+    <Choose>
+        <When Condition="$(RuntimeIdentifier.StartsWith('osx'))">
+            <PropertyGroup>
+                <!-- macOS platform -->
+                <TargetFramework>net10.0</TargetFramework>
+                <IsMacOSX>true</IsMacOSX>
+                <DefineConstants>$(DefineConstants);MACOS;PLATFORM_OSX</DefineConstants>
+                <LibraryExtension>.dylib</LibraryExtension>
+                <MyNativeLibDir>$(MSBuildProjectDirectory)/../mynativelib/</MyNativeLibDir>
+                <!-- macOS 64-bit -->
+                <ArchSuffix Condition="$(RuntimeIdentifier.EndsWith('x64'))">osx64</ArchSuffix>
+            </PropertyGroup>
+        </When>
+        <Otherwise>
+            <PropertyGroup>
+                <IsMacOSX>false</IsMacOSX>
+            </PropertyGroup>
+        </Otherwise>
+    </Choose>
+
+    <PropertyGroup>
+        <!-- Store original assembly name -->
+        <OriginalAssemblyName Condition="'$(OriginalAssemblyName)' == ''">$(AssemblyName)</OriginalAssemblyName>
+        <BinaryModuleFileName Condition="'$(IsClientModule)' == 'true'">gmcl_$(OriginalAssemblyName)_$(ArchSuffix)</BinaryModuleFileName>
+        <BinaryModuleFileName Condition="'$(IsClientModule)' != 'true'">gmsv_$(OriginalAssemblyName)_$(ArchSuffix)</BinaryModuleFileName>
+        <!-- Reminder: Garry's Mod Lua binary modules are always .dll regardless of platform -->
+        <AssemblyName Condition="'$(PublishAot)' == 'true'">$(BinaryModuleFileName)</AssemblyName>
+    </PropertyGroup>
+
+    <!-- ============================================================
+     MAIN NATIVEAOT SETTINGS
+     ============================================================ -->
+    <PropertyGroup Condition="'$(PublishAot)' == 'true'">
+
+        <NativeLib Condition="'$(OutputType)' == 'Exe'">Static</NativeLib>
+        <NativeLib Condition="'$(OutputType)' == 'Library'">Shared</NativeLib>
+        <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
+        <SelfContained>true</SelfContained>
+
+        <!-- ============================
+         PERFORMANCE OPTIMIZATIONS
+         ============================ -->
+
+        <!-- Prefer speed over size (mandatory for AOT) -->
+        <IlcOptimizationPreference>Speed</IlcOptimizationPreference>
+
+        <!-- Deduplicate identical IL methods -->
+        <IlcFoldIdenticalMethodBodies>true</IlcFoldIdenticalMethodBodies>
+
+        <!-- Conditionally remove debug symbols -->
+        <StripSymbols Condition="'$(DebugSymbols)' == 'true'">false</StripSymbols>
+        <StripSymbols Condition="'$(DebugSymbols)' != 'true'">true</StripSymbols>
+
+
+        <!-- ============================
+         GLOBALIZATION REMOVAL
+         ============================ -->
+
+        <!-- Remove ICU and culture data -->
+        <InvariantGlobalization>true</InvariantGlobalization>
+        <IlcInvariantGlobalization>true</IlcInvariantGlobalization>
+
+
+        <!-- ============================
+         TRIMMING & METADATA REMOVAL
+         ============================ -->
+
+        <!-- Enable IL trimming -->
+        <IsTrimmable>true</IsTrimmable>
+        <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+        <TrimmerSingleWarn>false</TrimmerSingleWarn>
+        <TrimAllAssemblies>true</TrimAllAssemblies>
+        <RootAllApplicationAssemblies>false</RootAllApplicationAssemblies>
+        <PublishTrimmed>true</PublishTrimmed>
+        <TrimMode>full</TrimMode>
+
+        <!-- Remove unused metadata -->
+        <IlcTrimMetadata>true</IlcTrimMetadata>
+
+        <!-- Remove type metadata not needed for reflection -->
+        <IlcGenerateCompleteTypeMetadata>false</IlcGenerateCompleteTypeMetadata>
+
+        <!-- Remove stack trace metadata -->
+        <IlcGenerateStackTraceData>false</IlcGenerateStackTraceData>
+
+
+        <!-- ============================
+         REFLECTION / RTTI REMOVAL
+         ============================ -->
+
+        <!-- Disable reflection entirely -->
+        <IlcDisableReflection>true</IlcDisableReflection>
+
+        <!-- Remove reflection tracking tables -->
+        <IlcDisableReflectionTracking>true</IlcDisableReflectionTracking>
+
+        <!-- Remove runtime marshalling helpers -->
+        <IlcDisableRuntimeMarshalling>true</IlcDisableRuntimeMarshalling>
+
+
+        <!-- ============================
+         EXCEPTION HANDLING REMOVAL
+         ============================ -->
+
+        <!-- Remove exception messages -->
+        <IlcDisableExceptionMessages>true</IlcDisableExceptionMessages>
+
+        <!-- Remove stack traces -->
+        <IlcDisableStackTrace>true</IlcDisableStackTrace>
+
+        <!-- Remove unmanaged stack traces -->
+        <IlcDisableUnmanagedCodeStackTrace>true</IlcDisableUnmanagedCodeStackTrace>
+
+        <!-- Remove unhandled exception experience -->
+        <IlcDisableUnhandledExceptionExperience>true</IlcDisableUnhandledExceptionExperience>
+
+
+        <!-- ============================
+         INTEROP REMOVAL
+         ============================ -->
+
+        <!-- Remove unused interop helpers -->
+        <IlcDisableInteropFeatures>true</IlcDisableInteropFeatures>
+
+
+        <!-- ============================
+         MICRO-BINARY MODE (EXTREME)
+         ============================ -->
+
+        <!-- Remove runtime type info -->
+        <IlcDisableRuntimeTypeInfo>true</IlcDisableRuntimeTypeInfo>
+
+        <!-- Remove generic metadata -->
+        <IlcDisableGenericMetadata>true</IlcDisableGenericMetadata>
+
+        <!-- Remove COM support -->
+        <IlcDisableCom>true</IlcDisableCom>
+
+        <!-- Remove TLS helpers -->
+        <IlcDisableTls>true</IlcDisableTls>
+
+        <!-- Remove unused GC features (safe for simple modules) -->
+        <IlcDisableGcFeatures>true</IlcDisableGcFeatures>
+
+        <!-- Remove diagnostic helpers -->
+        <IlcDisableDiagnostics>true</IlcDisableDiagnostics>
+
+    </PropertyGroup>
+
+    <!-- ============================================================
+     NATIVEAOT LINKING (STATIC LIBRARIES, DIRECT PINVOKE, ETC.)
+     ============================================================ -->
+
+    <!-- Define library path properties for each platform -->
+    <PropertyGroup Condition="'$(PublishAot)' == 'true'">
+        <LinkerLibraryPath Condition="'$(IsWindows)' == 'true'">$(MSBuildProjectDirectory)\..\artifacts\runtimes\$(RuntimeIdentifier)\native</LinkerLibraryPath>
+        <LinkerLibraryPath Condition="'$(IsLinux)' == 'true'">$(MSBuildProjectDirectory)/../artifacts/runtimes/$(RuntimeIdentifier)/native</LinkerLibraryPath>
+        <LinkerLibraryPath Condition="'$(IsMacOSX)' == 'true'">$(MSBuildProjectDirectory)/../artifacts/runtimes/$(RuntimeIdentifier)/native</LinkerLibraryPath>
+    </PropertyGroup>
+
+    <!-- Direct P/Invoke generation (common to all platforms) -->
+    <ItemGroup Condition="'$(PublishAot)' == 'true'">
+        <DirectPInvoke Include="mynativelib" Visible="false"/>
+    </ItemGroup>
+
+    <!-- Windows-specific linking -->
+    <ItemGroup Condition="'$(PublishAot)' == 'true' AND '$(IsWindows)' == 'true'">
+        <LinkerArg Include="/LIBPATH:$(LinkerLibraryPath)"/>
+        <!-- Static library -->
+        <NativeLibrary Include="$(LinkerLibraryPath)\mynativelib.lib" Visible="false" Condition="Exists('$(LinkerLibraryPath)\mynativelib.lib') AND '$(CompileMyNativeLibAsDll)' != 'true'"/>
+        <!-- Shared library -->
+        <NativeLibrary Include="$(LinkerLibraryPath)\mynativelib.dll" Visible="false" Condition="Exists('$(LinkerLibraryPath)\mynativelib.dll') AND '$(CompileMyNativeLibAsDll)' == 'true'"/>
+    </ItemGroup>
+
+    <!-- Linux-specific linking -->
+    <ItemGroup Condition="'$(PublishAot)' == 'true' AND '$(IsLinux)' == 'true'">
+        <LinkerArg Include="-L$(LinkerLibraryPath)"/>
+        <!-- Static library -->
+        <NativeLibrary Include="$(LinkerLibraryPath)/libmynativelib.a" Visible="false" Condition="Exists('$(LinkerLibraryPath)/libmynativelib.a') AND '$(CompileMyNativeLibAsDll)' != 'true'"/>
+        <!-- Shared library -->
+        <NativeLibrary Include="$(LinkerLibraryPath)/libmynativelib.so" Visible="false" Condition="Exists('$(LinkerLibraryPath)/libmynativelib.so') AND '$(CompileMyNativeLibAsDll)' == 'true'"/>
+    </ItemGroup>
+
+    <!-- macOS-specific linking -->
+    <ItemGroup Condition="'$(PublishAot)' == 'true' AND '$(IsMacOSX)' == 'true'">
+        <LinkerArg Include="-L$(LinkerLibraryPath)"/>
+        <!-- Static library -->
+        <NativeLibrary Include="$(LinkerLibraryPath)/libmynativelib.a" Visible="false" Condition="Exists('$(LinkerLibraryPath)/libmynativelib.a') AND '$(CompileMyNativeLibAsDll)' != 'true'"/>
+        <!-- Shared library -->
+        <NativeLibrary Include="$(LinkerLibraryPath)/libmynativelib.dylib" Visible="false" Condition="Exists('$(LinkerLibraryPath)/libmynativelib.dylib') AND '$(CompileMyNativeLibAsDll)' == 'true'"/>
+    </ItemGroup>
+
+    <!-- ============================================================
+     NUGET/PACKAGE REFERENCES
+     ============================================================ -->
+
+    <ItemGroup>
+        <!--<PackageReference Include="dnGLua.Detours" Version="*" />--> <!-- coming soon -->
+        <!--<PackageReference Include="dnGLua.Interop" Version="*" />--> <!-- patience, you, must, learn -->
+        <PackageReference Include="DNNE" Version="*"/>
+        <PackageReference Include="NativeInvoke" Version="*"/>
+        <!--<PackageReference Condition="'$(PublishAot)' == 'true'" Include="Microsoft.DotNet.ILCompiler" Version="10.0.5"/>-->
+    </ItemGroup>
+
+    <!-- ============================================================
+     VISUAL STUDIO PATH DETECTION
+     ============================================================ -->
+
+    <!-- Use vswhere to detect Visual Studio installation -->
+    <PropertyGroup>
+        <VsWherePath Condition="'$(VsWherePath)' == ''">C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe</VsWherePath>
+    </PropertyGroup>
+
+    <!-- Run vswhere to get the latest VS installation path -->
+    <Target Name="GetVisualStudioPath" BeforeTargets="BuildMyNativeLibrary">
+        <Exec Command="&quot;$(VsWherePath)&quot; -products * -latest -prerelease -requires Microsoft.Component.MSBuild -property installationPath"
+              ConsoleToMSBuild="true"
+              IgnoreExitCode="true"
+              Outputs="VSInstallPath">
+            <Output TaskParameter="ConsoleOutput" PropertyName="VSInstallPath"/>
+        </Exec>
+
+        <!-- Set VcVars64Path and VcVars32Path based on detected installation -->
+        <PropertyGroup>
+            <VcVars64Path Condition="'$(VSInstallPath)' != ''">$(VSInstallPath)\VC\Auxiliary\Build\vcvars64.bat</VcVars64Path>
+            <VcVars32Path Condition="'$(VSInstallPath)' != ''">$(VSInstallPath)\VC\Auxiliary\Build\vcvars32.bat</VcVars32Path>
+        </PropertyGroup>
+
+        <Message Text="Detected Visual Studio installation at: $(VSInstallPath)" Importance="high" Condition="'$(VSInstallPath)' != ''"/>
+        <Message Text="Using vcvars64.bat at: $(VcVars64Path)" Importance="high" Condition="'$(VcVars64Path)' != ''"/>
+        <Message Text="Using vcvars32.bat at: $(VcVars32Path)" Importance="high" Condition="'$(VcVars32Path)' != ''"/>
+    </Target>
+
+    <!-- ============================================================
+     CUSTOM ACTIONS (PRE/POST-BUILD TARGETS, ETC.)
+     ============================================================ -->
+
+    <!-- Build native library before main build for both managed and NativeAOT -->
+    <Target Name="BuildMyNativeLibrary"
+            BeforeTargets="Build"
+            Condition="'$(IsWindows)' == 'true'">
+        <!-- Validate that we found a Visual Studio installation -->
+        <Error Text="Visual Studio installation not found. Please install Visual Studio 2022/2026 with C++ build tools."
+               Condition="'$(IsWindows)' == 'true' AND '$(VSInstallPath)' == ''"/>
+        <Error Text="vcvars64.bat not found at: $(VcVars64Path). Make sure you have installed the x64 C++ build tools."
+               Condition="'$(IsWindows)' == 'true' AND '$(Platform)' == 'x64' AND '$(VcVars64Path)' == ''"/>
+        <Error Text="vcvars32.bat not found at: $(VcVars32Path). Make sure you have installed the x86 C++ build tools."
+               Condition="'$(IsWindows)' == 'true' AND '$(Platform)' == 'x86' AND '$(VcVars32Path)' == ''"/>
+
+        <!-- Choose appropriate vcvars based on platform -->
+        <PropertyGroup>
+            <VcVarsPath Condition="'$(Platform)' == 'x64'">$(VcVars64Path)</VcVarsPath>
+            <VcVarsPath Condition="'$(Platform)' == 'x86'">$(VcVars32Path)</VcVarsPath>
+            <VcVarsPath Condition="'$(VcVarsPath)' == ''">$(VcVars64Path)</VcVarsPath> <!-- Default to x64 -->
+        </PropertyGroup>
+
+        <!-- Call appropriate OS-specific target -->
+        <CallTarget Targets="BuildMyNativeLibrary_Windows" Condition="'$(IsWindows)' == 'true'"/>
+        <CallTarget Targets="BuildMyNativeLibrary_Linux" Condition="'$(IsLinux)' == 'true'"/>
+        <CallTarget Targets="BuildMyNativeLibrary_macOS" Condition="'$(IsMacOSX)' == 'true'"/>
+    </Target>
+
+    <!-- Windows-specific native library build -->
+    <Target Name="BuildMyNativeLibrary_Windows">
+        <Message Text="Building native library for Windows using Visual Studio at: $(VSInstallPath)" Importance="high"/>
+
+        <!-- Compile source file -->
+        <Exec Command="cmd /c &quot;$(VcVarsPath)&quot; &amp;&amp; cl /nologo /c &quot;$(MyNativeLibDir)mynativelib.c&quot; /Fo&quot;$(IntermediateOutputPath)mynativelib.obj&quot;"
+              ContinueOnError="false"
+              Condition="Exists('$(MyNativeLibDir)mynativelib.c') AND '$(VcVarsPath)' != ''"/>
+
+        <!-- Create DLL or static library -->
+        <Exec Command="cmd /c &quot;$(VcVarsPath)&quot; &amp;&amp; cl /nologo /LD &quot;$(IntermediateOutputPath)mynativelib.obj&quot; /Fe&quot;$(IntermediateOutputPath)mynativelib.dll&quot;"
+              ContinueOnError="false"
+              Condition="'$(CompileMyNativeLibAsDll)' == 'true' AND Exists('$(IntermediateOutputPath)mynativelib.obj') AND '$(VcVarsPath)' != ''"/>
+
+        <Exec Command="cmd /c &quot;$(VcVarsPath)&quot; &amp;&amp; lib /nologo /OUT:&quot;$(IntermediateOutputPath)mynativelib.lib&quot; &quot;$(IntermediateOutputPath)mynativelib.obj&quot;"
+              ContinueOnError="false"
+              Condition="'$(CompileMyNativeLibAsDll)' != 'true' AND Exists('$(IntermediateOutputPath)mynativelib.obj') AND '$(VcVarsPath)' != ''"/>
+
+        <!-- Copy output files to LinkerLibraryPath -->
+        <MakeDir Directories="$(LinkerLibraryPath)"
+                 Condition="'$(CompileMyNativeLibAsDll)' == 'true' AND Exists('$(IntermediateOutputPath)mynativelib.dll')"/>
+        <Copy SourceFiles="$(IntermediateOutputPath)mynativelib.dll"
+              DestinationFolder="$(LinkerLibraryPath)"
+              OverwriteReadOnlyFiles="true"
+              SkipUnchangedFiles="true"
+              Condition="'$(CompileMyNativeLibAsDll)' == 'true' AND Exists('$(IntermediateOutputPath)mynativelib.dll')"/>
+
+        <MakeDir Directories="$(LinkerLibraryPath)"
+                 Condition="Exists('$(IntermediateOutputPath)mynativelib.lib')"/>
+        <Copy SourceFiles="$(IntermediateOutputPath)mynativelib.lib"
+              DestinationFolder="$(LinkerLibraryPath)"
+              OverwriteReadOnlyFiles="true"
+              SkipUnchangedFiles="true"
+              Condition="Exists('$(IntermediateOutputPath)mynativelib.lib')"/>
+    </Target>
+
+    <!-- Linux-specific native library build -->
+    <Target Name="BuildMyNativeLibrary_Linux">
+        <Message Text="Building native library for Linux using GCC" Importance="high"/>
+
+        <!-- Compile source file -->
+        <Exec Command="gcc -c &quot;$(MyNativeLibDir)mynativelib.c&quot; -o &quot;$(IntermediateOutputPath)mynativelib.o&quot;"
+              ContinueOnError="false"
+              Condition="Exists('$(MyNativeLibDir)mynativelib.c')"/>
+
+        <!-- Create shared library or static library -->
+        <Exec Command="gcc -shared -o &quot;$(IntermediateOutputPath)libmynativelib$(LibraryExtension)&quot; &quot;$(IntermediateOutputPath)mynativelib.o&quot;"
+              ContinueOnError="false"
+              Condition="'$(CompileMyNativeLibAsDll)' == 'true' AND Exists('$(IntermediateOutputPath)mynativelib.o')"/>
+
+        <Exec Command="ar rcs &quot;$(IntermediateOutputPath)libmynativelib.a&quot; &quot;$(IntermediateOutputPath)mynativelib.o&quot;"
+              ContinueOnError="false"
+              Condition="'$(CompileMyNativeLibAsDll)' != 'true' AND Exists('$(IntermediateOutputPath)mynativelib.o')"/>
+
+        <!-- Copy output files to LinkerLibraryPath -->
+        <MakeDir Directories="$(LinkerLibraryPath)"
+                 Condition="'$(CompileMyNativeLibAsDll)' == 'true' AND Exists('$(IntermediateOutputPath)libmynativelib$(LibraryExtension)')"/>
+        <Copy SourceFiles="$(IntermediateOutputPath)libmynativelib$(LibraryExtension)"
+              DestinationFolder="$(LinkerLibraryPath)"
+              OverwriteReadOnlyFiles="true"
+              SkipUnchangedFiles="true"
+              Condition="'$(CompileMyNativeLibAsDll)' == 'true' AND Exists('$(IntermediateOutputPath)libmynativelib$(LibraryExtension)')"/>
+
+        <MakeDir Directories="$(LinkerLibraryPath)"
+                 Condition="'$(CompileMyNativeLibAsDll)' != 'true' AND Exists('$(IntermediateOutputPath)libmynativelib.a')"/>
+        <Copy SourceFiles="$(IntermediateOutputPath)libmynativelib.a"
+              DestinationFolder="$(LinkerLibraryPath)"
+              OverwriteReadOnlyFiles="true"
+              SkipUnchangedFiles="true"
+              Condition="'$(CompileMyNativeLibAsDll)' != 'true' AND Exists('$(IntermediateOutputPath)libmynativelib.a')"/>
+    </Target>
+
+    <!-- macOS-specific native library build -->
+    <Target Name="BuildMyNativeLibrary_macOS">
+        <Message Text="Building native library for macOS using Clang" Importance="high"/>
+
+        <!-- Compile source file -->
+        <Exec Command="clang -c &quot;$(MyNativeLibDir)mynativelib.c&quot; -o &quot;$(IntermediateOutputPath)mynativelib.o&quot;"
+              ContinueOnError="false"
+              Condition="Exists('$(MyNativeLibDir)mynativelib.c')"/>
+
+        <!-- Create shared library or static library -->
+        <Exec Command="clang -shared -o &quot;$(IntermediateOutputPath)libmynativelib$(LibraryExtension)&quot; &quot;$(IntermediateOutputPath)mynativelib.o&quot;"
+              ContinueOnError="false"
+              Condition="'$(CompileMyNativeLibAsDll)' == 'true' AND Exists('$(IntermediateOutputPath)mynativelib.o')"/>
+
+        <Exec Command="ar rcs &quot;$(IntermediateOutputPath)libmynativelib.a&quot; &quot;$(IntermediateOutputPath)mynativelib.o&quot;"
+              ContinueOnError="false"
+              Condition="'$(CompileMyNativeLibAsDll)' != 'true' AND Exists('$(IntermediateOutputPath)mynativelib.o')"/>
+
+        <!-- Copy output files to LinkerLibraryPath -->
+        <MakeDir Directories="$(LinkerLibraryPath)"
+                 Condition="'$(CompileMyNativeLibAsDll)' == 'true' AND Exists('$(IntermediateOutputPath)libmynativelib$(LibraryExtension)')"/>
+        <Copy SourceFiles="$(IntermediateOutputPath)libmynativelib$(LibraryExtension)"
+              DestinationFolder="$(LinkerLibraryPath)"
+              OverwriteReadOnlyFiles="true"
+              SkipUnchangedFiles="true"
+              Condition="'$(CompileMyNativeLibAsDll)' == 'true' AND Exists('$(IntermediateOutputPath)libmynativelib$(LibraryExtension)')"/>
+
+        <MakeDir Directories="$(LinkerLibraryPath)"
+                 Condition="'$(CompileMyNativeLibAsDll)' != 'true' AND Exists('$(IntermediateOutputPath)libmynativelib.a')"/>
+        <Copy SourceFiles="$(IntermediateOutputPath)libmynativelib.a"
+              DestinationFolder="$(LinkerLibraryPath)"
+              OverwriteReadOnlyFiles="true"
+              SkipUnchangedFiles="true"
+              Condition="'$(CompileMyNativeLibAsDll)' != 'true' AND Exists('$(IntermediateOutputPath)libmynativelib.a')"/>
+    </Target>
+
+    <!-- Rename native module only after NativeAOT publish -->
+    <!--<Target Name="RenameMyNativeModule"-->
+    <!--        AfterTargets="Publish"-->
+    <!--        Condition="'$(PublishAot)' == 'true'">-->
+    <!--    &lt;!&ndash; Clear all files in the $(OutputPath) directory, top-level files only &ndash;&gt;-->
+    <!--    <ItemGroup>-->
+    <!--        <FilesToClean Include="$(OutputPath)*.*"/>-->
+    <!--    </ItemGroup>-->
+    <!--    <Delete Files="@(FilesToClean)" ContinueOnError="true"/>-->
+    <!--    &lt;!&ndash; Reminder: Garry's Mod Lua binary modules are always .dll regardless of platform &ndash;&gt;-->
+    <!--    <Copy-->
+    <!--        SourceFiles="$(PublishDir)$(TargetName)$(TargetExt)"-->
+    <!--        DestinationFiles="$(PublishDir)$(AssemblyName).dll"-->
+    <!--        OverwriteReadOnlyFiles="true"-->
+    <!--        SkipUnchangedFiles="true"/>-->
+    <!--</Target>-->
+
+    <!--<Target Name="RenameNativeExportDll" AfterTargets="Build">-->
+    <!--    <PropertyGroup>-->
+    <!--        <OldFile Condition="'$(PublishAot)' == 'true'">$(OutputPath)$(TargetFileName)</OldFile>-->
+    <!--        <OldFile Condition="'$(PublishAot)' != 'true'">$(OutputPath)$(AssemblyName)NE.dll</OldFile>-->
+    <!--        <NewFile>$(OutputPath)$(AssemblyName).dll</NewFile>-->
+    <!--    </PropertyGroup>-->
+    <!--    <Move SourceFiles="$(OldFile)" DestinationFiles="$(NewFile)" Condition="Exists('$(OldFile)')"/>-->
+    <!--</Target>-->
+
+    <!-- Rename the native-export file after a successful Build -->
+    <Target Condition="'$(PublishAot)' != 'true'" Name="RenameNativeExportFile" AfterTargets="Build">
+        <!-- Reminder: Garry's Mod Lua binary modules are always .dll regardless of platform -->
+        <Move SourceFiles="$(TargetDir)$(AssemblyName)NE.dll"
+              DestinationFiles="$(TargetDir)$(BinaryModuleFileName).dll"
+              OverwriteReadOnlyFiles="true"
+              Condition="Exists('$(TargetDir)$(AssemblyName)NE.dll')"/>
+    </Target>
+
+    <!-- Delete the native-export file after project Clean -->
+    <Target Condition="'$(PublishAot)' != 'true'" Name="CleanNativeExportFiles" AfterTargets="Clean">
+        <!-- Reminder: Garry's Mod Lua binary modules are always .dll regardless of platform -->
+        <ItemGroup>
+            <!-- Define the files to remove within the target scope -->
+            <FilesToDelete Include="$(TargetDir)$(BinaryModuleFileName).dll"/>
+        </ItemGroup>
+        <!-- The actual command that deletes the files -->
+        <Delete Files="@(FilesToDelete)"/>
+    </Target>
+
+</Project>
