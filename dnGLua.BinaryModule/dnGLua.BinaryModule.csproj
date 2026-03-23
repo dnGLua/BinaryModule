@@ -115,12 +115,14 @@
         <When Condition="'$(IsClientModule)' == 'true'">
             <PropertyGroup>
                 <DefineConstants>$(DefineConstants);CLIENT</DefineConstants>
+                <BinaryModuleFilePrefix>gmcl_</BinaryModuleFilePrefix>
             </PropertyGroup>
         </When>
         <Otherwise>
             <PropertyGroup>
                 <IsClientModule>false</IsClientModule>
                 <DefineConstants>$(DefineConstants);SERVER</DefineConstants>
+                <BinaryModuleFilePrefix>gmsv_</BinaryModuleFilePrefix>
             </PropertyGroup>
         </Otherwise>
     </Choose>
@@ -235,8 +237,8 @@
     <PropertyGroup>
         <!-- Store original assembly name -->
         <OriginalAssemblyName Condition="'$(OriginalAssemblyName)' == ''">$(AssemblyName)</OriginalAssemblyName>
-        <BinaryModuleFileName Condition="'$(IsClientModule)' == 'true'">gmcl_$(OriginalAssemblyName)_$(ArchSuffix)</BinaryModuleFileName>
-        <BinaryModuleFileName Condition="'$(IsClientModule)' != 'true'">gmsv_$(OriginalAssemblyName)_$(ArchSuffix)</BinaryModuleFileName>
+        <!-- Compute the final binary module filename -->
+        <BinaryModuleFileName>$(BinaryModuleFilePrefix)$(OriginalAssemblyName)_$(ArchSuffix)</BinaryModuleFileName>
         <!-- Reminder: Garry's Mod Lua binary modules are always .dll regardless of platform -->
         <AssemblyName Condition="'$(PublishAot)' == 'true'">$(BinaryModuleFileName)</AssemblyName>
     </PropertyGroup>

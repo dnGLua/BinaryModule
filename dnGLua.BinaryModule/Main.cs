@@ -1,7 +1,7 @@
 public static unsafe class Main
 {
   [UnmanagedCallersOnly(EntryPoint = "gmod13_open", CallConvs = [typeof(CallConvCdecl)])]
-  public static int GMOD_MODULE_OPEN(void* L)
+  public static int GMOD_MODULE_OPEN(void* L) // lua_shared bindings/interop library is coming soon
   {
 #if CLIENT
 #if NATIVE_AOT
