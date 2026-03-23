@@ -19,6 +19,8 @@
         <DisableOptimization>false</DisableOptimization>
         <!-- Whether to disable PDB generation -->
         <DisablePdb>false</DisablePdb>
+        <!-- Whether to build a native library (set to true to build mynativelib) -->
+        <BuildNativeLibrary>false</BuildNativeLibrary>
         <!-- Whether to compile mynativelib as DLL instead of static library -->
         <CompileMyNativeLibAsDll>true</CompileMyNativeLibAsDll>
     </PropertyGroup>
@@ -415,196 +417,27 @@
     </ItemGroup>
 
     <!-- ============================================================
-     VISUAL STUDIO PATH DETECTION
-     ============================================================ -->
-
-    <!-- Use vswhere to detect Visual Studio installation -->
-    <PropertyGroup>
-        <VsWherePath Condition="'$(VsWherePath)' == ''">C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe</VsWherePath>
-    </PropertyGroup>
-
-    <!-- Run vswhere to get the latest VS installation path -->
-    <Target Name="GetVisualStudioPath" BeforeTargets="BuildMyNativeLibrary">
-        <Exec Command="&quot;$(VsWherePath)&quot; -products * -latest -prerelease -requires Microsoft.Component.MSBuild -property installationPath"
-              ConsoleToMSBuild="true"
-              IgnoreExitCode="true"
-              Outputs="VSInstallPath">
-            <Output TaskParameter="ConsoleOutput" PropertyName="VSInstallPath"/>
-        </Exec>
-
-        <!-- Set VcVars64Path and VcVars32Path based on detected installation -->
-        <PropertyGroup>
-            <VcVars64Path Condition="'$(VSInstallPath)' != ''">$(VSInstallPath)\VC\Auxiliary\Build\vcvars64.bat</VcVars64Path>
-            <VcVars32Path Condition="'$(VSInstallPath)' != ''">$(VSInstallPath)\VC\Auxiliary\Build\vcvars32.bat</VcVars32Path>
-        </PropertyGroup>
-
-        <Message Text="Detected Visual Studio installation at: $(VSInstallPath)" Importance="high" Condition="'$(VSInstallPath)' != ''"/>
-        <Message Text="Using vcvars64.bat at: $(VcVars64Path)" Importance="high" Condition="'$(VcVars64Path)' != ''"/>
-        <Message Text="Using vcvars32.bat at: $(VcVars32Path)" Importance="high" Condition="'$(VcVars32Path)' != ''"/>
-    </Target>
-
-    <!-- ============================================================
      CUSTOM ACTIONS (PRE/POST-BUILD TARGETS, ETC.)
      ============================================================ -->
 
     <!-- Build native library before main build for both managed and NativeAOT -->
     <Target Name="BuildMyNativeLibrary"
             BeforeTargets="Build"
-            Condition="'$(IsWindows)' == 'true'">
-        <!-- Validate that we found a Visual Studio installation -->
-        <Error Text="Visual Studio installation not found. Please install Visual Studio 2022/2026 with C++ build tools."
-               Condition="'$(IsWindows)' == 'true' AND '$(VSInstallPath)' == ''"/>
-        <Error Text="vcvars64.bat not found at: $(VcVars64Path). Make sure you have installed the x64 C++ build tools."
-               Condition="'$(IsWindows)' == 'true' AND '$(Platform)' == 'x64' AND '$(VcVars64Path)' == ''"/>
-        <Error Text="vcvars32.bat not found at: $(VcVars32Path). Make sure you have installed the x86 C++ build tools."
-               Condition="'$(IsWindows)' == 'true' AND '$(Platform)' == 'x86' AND '$(VcVars32Path)' == ''"/>
+            Condition="'$(BuildNativeLibrary)' == 'true'">
+        <Message Text="Building native library for $(RuntimeIdentifier) using build-native.ps1" Importance="high"/>
 
-        <!-- Choose appropriate vcvars based on platform -->
-        <PropertyGroup>
-            <VcVarsPath Condition="'$(Platform)' == 'x64'">$(VcVars64Path)</VcVarsPath>
-            <VcVarsPath Condition="'$(Platform)' == 'x86'">$(VcVars32Path)</VcVarsPath>
-            <VcVarsPath Condition="'$(VcVarsPath)' == ''">$(VcVars64Path)</VcVarsPath> <!-- Default to x64 -->
-        </PropertyGroup>
-
-        <!-- Call appropriate OS-specific target -->
-        <CallTarget Targets="BuildMyNativeLibrary_Windows" Condition="'$(IsWindows)' == 'true'"/>
-        <CallTarget Targets="BuildMyNativeLibrary_Linux" Condition="'$(IsLinux)' == 'true'"/>
-        <CallTarget Targets="BuildMyNativeLibrary_macOS" Condition="'$(IsMacOSX)' == 'true'"/>
+        <!-- Call build-native.ps1 to build native library -->
+        <Exec Command="pwsh -ExecutionPolicy Bypass -Command &quot;..\build-native.ps1 -p $(RuntimeIdentifier)&quot;"
+              ContinueOnError="false"
+              WorkingDirectory="$(MSBuildProjectDirectory)"/>
     </Target>
 
-    <!-- Windows-specific native library build -->
-    <Target Name="BuildMyNativeLibrary_Windows">
-        <Message Text="Building native library for Windows using Visual Studio at: $(VSInstallPath)" Importance="high"/>
-
-        <!-- Compile source file -->
-        <Exec Command="cmd /c &quot;$(VcVarsPath)&quot; &amp;&amp; cl /nologo /c &quot;$(MyNativeLibDir)mynativelib.c&quot; /Fo&quot;$(IntermediateOutputPath)mynativelib.obj&quot;"
-              ContinueOnError="false"
-              Condition="Exists('$(MyNativeLibDir)mynativelib.c') AND '$(VcVarsPath)' != ''"/>
-
-        <!-- Create DLL or static library -->
-        <Exec Command="cmd /c &quot;$(VcVarsPath)&quot; &amp;&amp; cl /nologo /LD &quot;$(IntermediateOutputPath)mynativelib.obj&quot; /Fe&quot;$(IntermediateOutputPath)mynativelib.dll&quot;"
-              ContinueOnError="false"
-              Condition="'$(CompileMyNativeLibAsDll)' == 'true' AND Exists('$(IntermediateOutputPath)mynativelib.obj') AND '$(VcVarsPath)' != ''"/>
-
-        <Exec Command="cmd /c &quot;$(VcVarsPath)&quot; &amp;&amp; lib /nologo /OUT:&quot;$(IntermediateOutputPath)mynativelib.lib&quot; &quot;$(IntermediateOutputPath)mynativelib.obj&quot;"
-              ContinueOnError="false"
-              Condition="'$(CompileMyNativeLibAsDll)' != 'true' AND Exists('$(IntermediateOutputPath)mynativelib.obj') AND '$(VcVarsPath)' != ''"/>
-
-        <!-- Copy output files to LinkerLibraryPath -->
-        <MakeDir Directories="$(LinkerLibraryPath)"
-                 Condition="'$(CompileMyNativeLibAsDll)' == 'true' AND Exists('$(IntermediateOutputPath)mynativelib.dll')"/>
-        <Copy SourceFiles="$(IntermediateOutputPath)mynativelib.dll"
-              DestinationFolder="$(LinkerLibraryPath)"
-              OverwriteReadOnlyFiles="true"
-              SkipUnchangedFiles="true"
-              Condition="'$(CompileMyNativeLibAsDll)' == 'true' AND Exists('$(IntermediateOutputPath)mynativelib.dll')"/>
-
-        <MakeDir Directories="$(LinkerLibraryPath)"
-                 Condition="Exists('$(IntermediateOutputPath)mynativelib.lib')"/>
-        <Copy SourceFiles="$(IntermediateOutputPath)mynativelib.lib"
-              DestinationFolder="$(LinkerLibraryPath)"
-              OverwriteReadOnlyFiles="true"
-              SkipUnchangedFiles="true"
-              Condition="Exists('$(IntermediateOutputPath)mynativelib.lib')"/>
+    <!-- Inform user when native library build is skipped -->
+    <Target Name="SkipNativeLibraryBuild"
+            BeforeTargets="Build"
+            Condition="'$(BuildNativeLibrary)' != 'true'">
+        <Message Text="Skipping native library build (BuildNativeLibrary=false)" Importance="high"/>
     </Target>
-
-    <!-- Linux-specific native library build -->
-    <Target Name="BuildMyNativeLibrary_Linux">
-        <Message Text="Building native library for Linux using GCC" Importance="high"/>
-
-        <!-- Compile source file -->
-        <Exec Command="gcc -c &quot;$(MyNativeLibDir)mynativelib.c&quot; -o &quot;$(IntermediateOutputPath)mynativelib.o&quot;"
-              ContinueOnError="false"
-              Condition="Exists('$(MyNativeLibDir)mynativelib.c')"/>
-
-        <!-- Create shared library or static library -->
-        <Exec Command="gcc -shared -o &quot;$(IntermediateOutputPath)libmynativelib$(LibraryExtension)&quot; &quot;$(IntermediateOutputPath)mynativelib.o&quot;"
-              ContinueOnError="false"
-              Condition="'$(CompileMyNativeLibAsDll)' == 'true' AND Exists('$(IntermediateOutputPath)mynativelib.o')"/>
-
-        <Exec Command="ar rcs &quot;$(IntermediateOutputPath)libmynativelib.a&quot; &quot;$(IntermediateOutputPath)mynativelib.o&quot;"
-              ContinueOnError="false"
-              Condition="'$(CompileMyNativeLibAsDll)' != 'true' AND Exists('$(IntermediateOutputPath)mynativelib.o')"/>
-
-        <!-- Copy output files to LinkerLibraryPath -->
-        <MakeDir Directories="$(LinkerLibraryPath)"
-                 Condition="'$(CompileMyNativeLibAsDll)' == 'true' AND Exists('$(IntermediateOutputPath)libmynativelib$(LibraryExtension)')"/>
-        <Copy SourceFiles="$(IntermediateOutputPath)libmynativelib$(LibraryExtension)"
-              DestinationFolder="$(LinkerLibraryPath)"
-              OverwriteReadOnlyFiles="true"
-              SkipUnchangedFiles="true"
-              Condition="'$(CompileMyNativeLibAsDll)' == 'true' AND Exists('$(IntermediateOutputPath)libmynativelib$(LibraryExtension)')"/>
-
-        <MakeDir Directories="$(LinkerLibraryPath)"
-                 Condition="'$(CompileMyNativeLibAsDll)' != 'true' AND Exists('$(IntermediateOutputPath)libmynativelib.a')"/>
-        <Copy SourceFiles="$(IntermediateOutputPath)libmynativelib.a"
-              DestinationFolder="$(LinkerLibraryPath)"
-              OverwriteReadOnlyFiles="true"
-              SkipUnchangedFiles="true"
-              Condition="'$(CompileMyNativeLibAsDll)' != 'true' AND Exists('$(IntermediateOutputPath)libmynativelib.a')"/>
-    </Target>
-
-    <!-- macOS-specific native library build -->
-    <Target Name="BuildMyNativeLibrary_macOS">
-        <Message Text="Building native library for macOS using Clang" Importance="high"/>
-
-        <!-- Compile source file -->
-        <Exec Command="clang -c &quot;$(MyNativeLibDir)mynativelib.c&quot; -o &quot;$(IntermediateOutputPath)mynativelib.o&quot;"
-              ContinueOnError="false"
-              Condition="Exists('$(MyNativeLibDir)mynativelib.c')"/>
-
-        <!-- Create shared library or static library -->
-        <Exec Command="clang -shared -o &quot;$(IntermediateOutputPath)libmynativelib$(LibraryExtension)&quot; &quot;$(IntermediateOutputPath)mynativelib.o&quot;"
-              ContinueOnError="false"
-              Condition="'$(CompileMyNativeLibAsDll)' == 'true' AND Exists('$(IntermediateOutputPath)mynativelib.o')"/>
-
-        <Exec Command="ar rcs &quot;$(IntermediateOutputPath)libmynativelib.a&quot; &quot;$(IntermediateOutputPath)mynativelib.o&quot;"
-              ContinueOnError="false"
-              Condition="'$(CompileMyNativeLibAsDll)' != 'true' AND Exists('$(IntermediateOutputPath)mynativelib.o')"/>
-
-        <!-- Copy output files to LinkerLibraryPath -->
-        <MakeDir Directories="$(LinkerLibraryPath)"
-                 Condition="'$(CompileMyNativeLibAsDll)' == 'true' AND Exists('$(IntermediateOutputPath)libmynativelib$(LibraryExtension)')"/>
-        <Copy SourceFiles="$(IntermediateOutputPath)libmynativelib$(LibraryExtension)"
-              DestinationFolder="$(LinkerLibraryPath)"
-              OverwriteReadOnlyFiles="true"
-              SkipUnchangedFiles="true"
-              Condition="'$(CompileMyNativeLibAsDll)' == 'true' AND Exists('$(IntermediateOutputPath)libmynativelib$(LibraryExtension)')"/>
-
-        <MakeDir Directories="$(LinkerLibraryPath)"
-                 Condition="'$(CompileMyNativeLibAsDll)' != 'true' AND Exists('$(IntermediateOutputPath)libmynativelib.a')"/>
-        <Copy SourceFiles="$(IntermediateOutputPath)libmynativelib.a"
-              DestinationFolder="$(LinkerLibraryPath)"
-              OverwriteReadOnlyFiles="true"
-              SkipUnchangedFiles="true"
-              Condition="'$(CompileMyNativeLibAsDll)' != 'true' AND Exists('$(IntermediateOutputPath)libmynativelib.a')"/>
-    </Target>
-
-    <!-- Rename native module only after NativeAOT publish -->
-    <!--<Target Name="RenameMyNativeModule"-->
-    <!--        AfterTargets="Publish"-->
-    <!--        Condition="'$(PublishAot)' == 'true'">-->
-    <!--    &lt;!&ndash; Clear all files in the $(OutputPath) directory, top-level files only &ndash;&gt;-->
-    <!--    <ItemGroup>-->
-    <!--        <FilesToClean Include="$(OutputPath)*.*"/>-->
-    <!--    </ItemGroup>-->
-    <!--    <Delete Files="@(FilesToClean)" ContinueOnError="true"/>-->
-    <!--    &lt;!&ndash; Reminder: Garry's Mod Lua binary modules are always .dll regardless of platform &ndash;&gt;-->
-    <!--    <Copy-->
-    <!--        SourceFiles="$(PublishDir)$(TargetName)$(TargetExt)"-->
-    <!--        DestinationFiles="$(PublishDir)$(AssemblyName).dll"-->
-    <!--        OverwriteReadOnlyFiles="true"-->
-    <!--        SkipUnchangedFiles="true"/>-->
-    <!--</Target>-->
-
-    <!--<Target Name="RenameNativeExportDll" AfterTargets="Build">-->
-    <!--    <PropertyGroup>-->
-    <!--        <OldFile Condition="'$(PublishAot)' == 'true'">$(OutputPath)$(TargetFileName)</OldFile>-->
-    <!--        <OldFile Condition="'$(PublishAot)' != 'true'">$(OutputPath)$(AssemblyName)NE.dll</OldFile>-->
-    <!--        <NewFile>$(OutputPath)$(AssemblyName).dll</NewFile>-->
-    <!--    </PropertyGroup>-->
-    <!--    <Move SourceFiles="$(OldFile)" DestinationFiles="$(NewFile)" Condition="Exists('$(OldFile)')"/>-->
-    <!--</Target>-->
 
     <!-- Rename the native-export file after a successful Build -->
     <Target Condition="'$(PublishAot)' != 'true'" Name="RenameNativeExportFile" AfterTargets="Build">

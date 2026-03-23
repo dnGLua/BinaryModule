@@ -12,6 +12,31 @@ This project uses a modern cross-platform build system:
 - **Managed Code**: Built with .NET SDK (`dotnet`)
 - **Build Scripts**: PowerShell (`pwsh`)
 
+### MSBuild Properties
+
+The project supports several configurable MSBuild properties that can be set in the project file (.csproj) or passed via
+command-line:
+
+| Property                  | Default | Description                                                        |
+|---------------------------|---------|--------------------------------------------------------------------|
+| `IsClientModule`          | `true`  | Whether this is a client-side module (defines `CLIENT` constant)   |
+| `DisableOptimization`     | `false` | Whether to disable code optimizations                              |
+| `DisablePdb`              | `false` | Whether to disable PDB generation                                  |
+| `BuildNativeLibrary`      | `false` | Whether to build the native C library (set to `true` to build)     |
+| `CompileMyNativeLibAsDll` | `true`  | Whether to compile native library as DLL instead of static library |
+
+#### Usage Examples
+
+```xml
+
+<PropertyGroup>
+  <!-- Build the 'mynativelib' library -->
+  <BuildNativeLibrary>true</BuildNativeLibrary>
+  <!-- Compile it as static library instead of DLL (requires BuildNativeLibrary and PublishAot) -->
+  <CompileMyNativeLibAsDll>false</CompileMyNativeLibAsDll>
+</PropertyGroup>
+```
+
 ## Conditional Compilation Constants
 
 The project defines several constants that can be used for conditional compilation in C# code:
