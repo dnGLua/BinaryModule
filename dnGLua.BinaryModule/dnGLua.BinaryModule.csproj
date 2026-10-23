@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <!-- ============================================================
      CORE PROJECT SETTINGS
@@ -428,10 +428,10 @@
             Condition="'$(BuildNativeLibrary)' == 'true'">
         <Message Text="Building native library for $(RuntimeIdentifier) using build-native.ps1" Importance="high"/>
 
-        <!-- Call build-native.ps1 to build native library -->
-        <Exec Command="pwsh -ExecutionPolicy Bypass -Command &quot;..\build-native.ps1 -p $(RuntimeIdentifier)&quot;"
+        <!-- Call build-native.ps1 from the repository root; the script uses root-relative paths -->
+        <Exec Command="pwsh -ExecutionPolicy Bypass -File build-native.ps1 -p $(RuntimeIdentifier)"
               ContinueOnError="false"
-              WorkingDirectory="$(MSBuildProjectDirectory)"/>
+              WorkingDirectory="$(MSBuildProjectDirectory)\.."/>
     </Target>
 
     <!-- Inform user when native library build is skipped -->

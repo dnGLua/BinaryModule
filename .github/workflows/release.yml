@@ -1,0 +1,135 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build AOT version
+      run: ./build-module.ps1 -Type aot
+
+    - name: Build Managed version
+      run: ./build-module.ps1 -Type managed
+
+    - name: Build native libraries
+      run: ./build-native.ps1
+
+    - name: Create release archive
+      run: |
+        # Create release directory
+        mkdir release
+        
+        # Copy AOT build
+        if (Test-Path "bin-aot") {
+          Copy-Item -Recurse "bin-aot\*" "release\"
+        }
+        
+        # Copy Managed build
+        if (Test-Path "bin-managed") {
+          Copy-Item -Recurse "bin-managed\*" "release\"
+        }
+        
+        # Copy native libraries
+        if (Test-Path "artifacts") {
+          Copy-Item -Recurse "artifacts\*" "release\"
+        }
+        
+        # Create README for release
+        @"
+        # dnGLua Binary Module Release ${{ github.ref_name }}
+        
+        ## Build Information
+        - **Commit**: ${{ github.sha }}
+        - **Branch**: ${{ github.ref_name }}
+        - **Date**: ${{ github.event.head_commit.timestamp }}
+        
+        ## Contents
+        
+        ### AOT Version
+        - Native AOT compiled binary module
+        - No .NET runtime dependency
+        - Best performance
+        
+        ### Managed Version
+        - .NET runtime required
+        - Cross-platform compatible
+        - Easier debugging
+        
+        ### Native Libraries
+        - Pre-compiled C libraries for all platforms
+        - Optional for advanced scenarios
+        
+        ## Installation
+        
+        1. Extract the release archive
+        2. Copy the appropriate binary module to your Garry's Mod `lua/bin` folder
+        3. Ensure you have the required .NET runtime (for managed version)
+        
+        ## Support
+        
+        For issues and feature requests, please visit the [GitHub repository](${{ github.repository }})
+        "@ | Out-File -FilePath "release\README.md" -Encoding utf8
+
+    - name: Create release archive
+      run: Compress-Archive -Path release -DestinationPath dnGLua-BinaryModule-${{ github.ref_name }}.zip
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dnGLua-BinaryModule-${{ github.ref_name }}.zip
+        draft: false
+        prerelease: false
+        name: ${{ github.ref_name }}
+        tag: ${{ github.ref_name }}
+        body: |
+          ## dnGLua Binary Module Release ${{ github.ref_name }}
+          
+          ### 🚀 Features
+          - Cross-platform C# binary module for Garry's Mod
+          - NativeAOT and Managed build variants
+          - Native C library integration
+          
+          ### 📦 Build Variants
+          - **AOT**: Native compiled, no runtime dependency
+          - **Managed**: Cross-platform, requires .NET runtime
+          - **Native Libraries**: Optional C library components
+          
+          ### 🔧 Installation
+          1. Download the release archive
+          2. Extract to your Garry's Mod directory
+          3. Copy binary module to `lua/bin` folder
+          
+          ### ⚠️ Requirements
+          - Garry's Mod
+          - .NET 10 SDK (for managed version)
+          - Windows: Visual Studio 2022/2026 with C++ tools
+          - Linux/macOS: GCC or Clang
+          
+          ---
+          📄 [Full Release Notes](${{ github.repository }}/releases/tag/${{ github.ref_name }})
+        generate_release_notes: true
+        token: ${{ secrets.GITHUB_TOKEN }}

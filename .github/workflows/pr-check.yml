@@ -1,0 +1,110 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup PowerShell (Windows) or use existing (Linux)
+      if: runner.os == 'Windows'
+      uses: azure/powershell@v5
+      with:
+        pwsh: true
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build AOT version
+      run: ./build-module.ps1 -Type aot
+
+    - name: Build Managed version
+      run: ./build-module.ps1 -Type managed
+
+    - name: Check build outputs
+      run: |
+        Write-Host "Checking build outputs..."
+        
+        # Check AOT build
+        if (Test-Path "bin-aot") {
+          $aotFiles = Get-ChildItem "bin-aot\*" -File
+          Write-Host "AOT build files: $($aotFiles.Count)"
+          $aotFiles | ForEach-Object { Write-Host "  $($_.Name)" }
+        } else {
+          Write-Host "❌ AOT build directory not found"
+          exit 1
+        }
+        
+        # Check Managed build
+        if (Test-Path "bin-managed") {
+          $managedFiles = Get-ChildItem "bin-managed\*" -File
+          Write-Host "Managed build files: $($managedFiles.Count)"
+          $managedFiles | ForEach-Object { Write-Host "  $($_.Name)" }
+        } else {
+          Write-Host "❌ Managed build directory not found"
+          exit 1
+        }
+
+    - name: Upload PR artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: pr-build-${{ matrix.os }}
+        path: |
+          bin-aot/
+          bin-managed/
+        retention-days: 7
+
+  validate-native:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup PowerShell
+      uses: azure/powershell@v5
+      with:
+        pwsh: true
+
+    - name: Build native libraries
+      run: ./build-native.ps1 -p linux-x64
+
+    - name: Validate native build
+      run: |
+        Write-Host "Validating native library build..."
+        
+        if (Test-Path "artifacts") {
+          $nativeFiles = Get-ChildItem "artifacts\*" -File -Recurse
+          Write-Host "Native library files: $($nativeFiles.Count)"
+          $nativeFiles | ForEach-Object { Write-Host "  $($_.FullName)" }
+        } else {
+          Write-Host "❌ Native library artifacts directory not found"
+          exit 1
+        }
+
+    - name: Upload native artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: pr-native-linux
+        path: artifacts/
+        retention-days: 7
